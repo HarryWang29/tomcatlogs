@@ -11,9 +11,12 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
 import smtplib
+import ConfigParser
 
 #指定目录
 g_rootdir = "./tomcatlog/"
+#配置文件路径
+g_ConfigPath = "./mail.conf"
 #需要统计的字段
 g_needlist = ["/update.xml", "/version.xml"]
 #Y轴步长
@@ -22,6 +25,8 @@ g_Ystep = 20
 g_MailDict = defaultdict(basestring)
 #文件日期
 g_FileDate = ""
+#配置文件信息
+g_ConfigDict = {}
 #初始化html语句
 g_html = """\
     <html>
@@ -158,16 +163,16 @@ def SendMail(files):
         msg.attach(att)
 
     #此处两行写法很奇怪,为了群发才如此写
-    strTo = ["test@gmail.com"]
+    strTo = g_ConfigDict['to']
     msg['to'] = ','.join(strTo)
-    msg['from'] = '*****@gmail.com'
+    msg['from'] = g_ConfigDict['from']
     subject = u"从" + dic[0][0] + u"至" + dic[-1][0] + u"的tomcat访问统计"
     msg['subject'] = subject
 
     try:
         server = smtplib.SMTP()
-        server.connect('smtp.gmail.com')
-        server.login('****@gmail.com', '*******')
+        server.connect(g_ConfigDict['smtp'])
+        server.login(g_ConfigDict['from'], g_ConfigDict['password'])
         server.sendmail(msg['from'], strTo, msg.as_string())
         server.quit()
         print 'success'
@@ -182,7 +187,18 @@ def MakeText(table):
     html = g_body % (text, table.get_html_string(attributes={"border":"1"}), g_FileDate)
     g_MailDict[g_FileDate] = html
 
+#获取配置文件
+def GetConfigureValue():
+    cf = ConfigParser.SafeConfigParser()
+    cf.read(g_ConfigPath)
+    global g_ConfigDict
+    section = "mail"
+    for option in cf.options(section):
+        g_ConfigDict[option] = cf.get(section, option)
+    g_ConfigDict['to'] = g_ConfigDict['to'].replace(" ", "").split(',')
+
 if __name__ == "__main__":
+    GetConfigureValue()
     files = GetFileNames()
     for file in files:
         if ".DS_Store" in file:
